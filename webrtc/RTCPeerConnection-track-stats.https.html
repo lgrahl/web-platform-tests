@@ -378,6 +378,39 @@
     }));
   }, 'replaceTrack(): original track attachment stats present after replacing');
 
+  promise_test(async function() {
+    const caller = new RTCPeerConnection();
+    const callee = new RTCPeerConnection();
+    let [tracks, streams] = await getUserMediaTracksAndStreams(2);
+    let sender = caller.addTrack(tracks[0], streams[0]);
+    callee.addTrack(tracks[1], streams[1]);
+    await doSignalingHandshake(caller, callee);
+    let receiver = caller.getReceivers()[0];
+
+    // Obtain inbound and outbound RTP stream stats on a full stats report.
+    let fullReport = await caller.getStats();
+    let outboundTrackStats = findStatsByTypeAndId(
+        fullReport, 'track', sender.track.id);
+    let outboundStats = findStatsByTypeAndMember(
+        fullReport, 'outbound-rtp', 'trackId', outboundTrackStats.id);
+    assert_true(outboundStats != null, 'Has stats for outbound RTP stream');
+    validateRtcStats(fullReport, outboundTrackStats);
+    validateRtcStats(fullReport, outboundStats);
+    let inboundTrackStats = findStatsByTypeAndId(
+        fullReport, 'track', receiver.track.id);
+    let inboundStats = findStatsByTypeAndMember(
+        fullReport, 'inbound-rtp', 'trackId', inboundTrackStats.id);
+    assert_true(inboundStats != null, 'Has stats for inbound RTP stream');
+    validateRtcStats(fullReport, inboundTrackStats);
+    validateRtcStats(fullReport, inboundStats);
+
+    // Perform stats selection algorithm with sender selector. The result should
+    // contain the outbound-rtp but not the inbound-rtp.
+    let senderReport = await sender.getStats();
+    assert_true(senderReport.has(outboundStats.id));
+    assert_false(senderReport.has(inboundStats.id));
+  }, 'RTCRtpSender.getStats() contains the outbound-rtp, not the inbound-rtp');
+
   // Helpers.
 
   function findStatsByTypeAndId(report, type, identifier) {
