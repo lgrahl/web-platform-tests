@@ -2921,6 +2921,13 @@ policies and contribution forms [3].
 
     var tests = new Tests();
 
+    /** Allow to reset the global timeout from the outside. */
+    function reset_global_timeout()
+    {
+        tests.set_timeout();
+    }
+    expose(reset_global_timeout, "reset_global_timeout");
+
     var error_handler = function(e) {
         if (tests.tests.length === 0 && !tests.allow_uncaught_exception) {
             tests.set_file_is_test();

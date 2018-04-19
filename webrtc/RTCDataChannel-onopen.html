@@ -4,6 +4,7 @@
 <script src=/resources/testharness.js></script>
 <script src=/resources/testharnessreport.js></script>
 <script src="RTCPeerConnection-helper.js"></script>
+<script src="cross-browser-helper.js"></script>
 <script>
 'use strict';
 
@@ -19,81 +20,89 @@
        4. Fire a simple event named open at channel.
  */
 
-async_test(t => {
-  const pc1 = new RTCPeerConnection();
-  const pc2 = new RTCPeerConnection();
-  t.add_cleanup(() => pc1.close());
-  t.add_cleanup(() => pc2.close());
+// Timeout: 3s/10s
+cross_browser_test(async (t, signaling, offering) => {
+  const pc = new RTCPeerConnection();
+  t.add_cleanup(() => pc.close());
+  const future = new Future();
 
-  exchangeIceCandidates(pc1, pc2);
+  // Create an in-band negotiated channel
+  if (offering) {
+    const dc = pc.createDataChannel('onopen');
 
-  // Create a channel on pc1
-  const dc = pc1.createDataChannel('onopen');
-  dc.onopen = t.step_func(() => {
-    assert_equals(dc.readyState, 'open', 'Channel should be open after onopen has fired');
-    t.done();
-  });
-
-  doSignalingHandshake(pc1, pc2)
-  .catch(t.step_func(err =>
-    assert_unreached(`Unexpected promise rejection: ${err}`)));
-}, 'In-band channel: Open event should be fired (local) when the data channel opens');
-
-async_test(t => {
-  const pc1 = new RTCPeerConnection();
-  const pc2 = new RTCPeerConnection();
-  t.add_cleanup(() => pc1.close());
-  t.add_cleanup(() => pc2.close());
-
-  exchangeIceCandidates(pc1, pc2);
-
-  // Create a channel on pc1
-  pc1.createDataChannel('onopen');
-
-  // Wait for it to open on pc2
-  pc2.ondatachannel = t.step_func((event) => {
-    const dc = event.channel;
-    dc.onopen = t.step_func(() => {
-      assert_equals(dc.readyState, 'open', 'Channel should be open after onopen has fired');
-      t.done();
-    });
-  });
-
-  doSignalingHandshake(pc1, pc2)
-  .catch(t.step_func(err =>
-    assert_unreached(`Unexpected promise rejection: ${err}`)));
-}, 'In-band channel: Open event should be fired (remote) when the data channel opens');
-
-async_test(t => {
-  const pc1 = new RTCPeerConnection();
-  const pc2 = new RTCPeerConnection();
-  t.add_cleanup(() => pc1.close());
-  t.add_cleanup(() => pc2.close());
-
-  exchangeIceCandidates(pc1, pc2);
-  let nOpen = 0;
-
-  // Create a negotiated channel on both pcs
-  const dc1 = pc1.createDataChannel('onopen', {
-    negotiated: true,
-    id: 42
-  });
-  const dc2 = pc2.createDataChannel('onopen', {
-    negotiated: true,
-    id: 42
-  });
-  for (const dc of [dc1, dc2]) {
-    dc.onopen = t.step_func(() => {
-      assert_equals(dc.readyState, 'open', 'Channel should be open after onopen has fired');
-      if (++nOpen === 2) {
-        t.done();
-      }
-    });
+    // Wait for the channel to open
+    dc.addEventListener('open', t.step_func(() => {
+      assert_equals(dc.readyState, 'open', 'Channel should be open after open has fired');
+      future.resolve();
+    }), { once: true });
+  } else {
+    future.resolve();
   }
 
-  doSignalingHandshake(pc1, pc2)
-  .catch(t.step_func(err =>
-    assert_unreached(`Unexpected promise rejection: ${err}`)));
-}, 'Negotiated channel: Open event should be fired when the channels open');
+  // Bind candidate events and do offer/answer exchange
+  signaling.exchangeCandidates(t, pc);
+  await signaling.exchangeDescriptions(pc, offering);
+  await future;
+}, 'In-band channel: Open event should be fired (local) when the data channel opens', {
+  timeout: 3000
+});
+
+// Timeout: 6s/10s
+cross_browser_test(async (t, signaling, offering) => {
+  const pc = new RTCPeerConnection();
+  t.add_cleanup(() => pc.close());
+  const future = new Future();
+
+  // Create an in-band negotiated channel
+  if (offering) {
+    pc.createDataChannel('onopen');
+    future.resolve();
+  } else {
+    // Wait for the channel
+    pc.addEventListener('datachannel', t.step_func((event) => {
+      const dc = event.channel;
+
+      // Wait for the channel to open
+      dc.addEventListener('open', t.step_func(() => {
+        assert_equals(dc.readyState, 'open', 'Channel should be open after open has fired');
+        future.resolve();
+      }), { once: true });
+    }), { once: true });
+  }
+
+  // Bind candidate events and do offer/answer exchange
+  signaling.exchangeCandidates(t, pc);
+  await signaling.exchangeDescriptions(pc, offering);
+  await future;
+}, 'In-band channel: Open event should be fired (remote) when the data channel opens', {
+  timeout: 3000
+});
+
+// Timeout: 9s/10s
+cross_browser_test(async (t, signaling, offering) => {
+  const pc = new RTCPeerConnection();
+  t.add_cleanup(() => pc.close());
+  const future = new Future();
+
+  // Create a negotiated channel
+  const dc = pc.createDataChannel('onopen', {
+    negotiated: true,
+    id: 42
+  });
+
+  // Wait for the channel to open
+  dc.addEventListener('open', t.step_func(() => {
+    assert_equals(dc.readyState, 'open', 'Channel should be open after open has fired');
+    future.resolve();
+  }), { once: true });
+
+  // Bind candidate events and do offer/answer exchange
+  // Wait for the channel to open
+  signaling.exchangeCandidates(t, pc);
+  await signaling.exchangeDescriptions(pc, offering);
+  await future.resolve();
+}, 'Negotiated channel: Open event should be fired when the channels open', {
+  timeout: 3000
+});
 
 </script>
