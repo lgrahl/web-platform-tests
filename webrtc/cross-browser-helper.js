@@ -269,10 +269,10 @@ class LoopbackSignaling extends Signaling {
 
 /**
  * A signalling implementation intended for this signalling server:
- * https://github.com/rawrtc/rawrtc-terminal-demo/tree/master/signaling
+ * https://github.com/lgrahl/silly-signaling
  *
- * Example: `ws://localhost/meow/0` when offering, and
- *          `ws://localhost/meow/1` when answering.
+ * Example: `ws://localhost/path/0` when offering, and
+ *          `ws://localhost/path/1` when answering.
  */
 class WebSocketSignaling extends Signaling {
   /**
@@ -328,12 +328,12 @@ class WebSocketSignaling extends Signaling {
 const params = new URLSearchParams(document.location.search);
 const crossBrowserEnabled = params.get('crossBrowser') !== null;
 const signalingServerBaseUrl = params.get('signalingServer');
-const offering = params.get('role') === 'offering';
+const role = (params.get('role') === '1') ? 1 : 0;
 
 // In cross-browser mode, wait for the other browser and reset the global tests timeout
 const readyFuture = new Future();
 if (crossBrowserEnabled) {
-  const signalingServerUrl = `${signalingServerBaseUrl}/are-you-there?/${offering ? 1 : 0}`;
+  const signalingServerUrl = `${signalingServerBaseUrl}/are-you-there?/${role}`;
   const ws = new WebSocket(signalingServerUrl);
   ws.onopen = () => {
     ws.send('');
@@ -366,7 +366,7 @@ function cross_browser_test(func, name, properties) {
       if (signalingServerBaseUrl === null) {
         assert_unreached('(Signaling) Base URL not supplied in URL parameters');
       }
-      const signalingServerUrl = `${signalingServerBaseUrl}/${test.index}/${offering ? 1 : 0}`;
+      const signalingServerUrl = `${signalingServerBaseUrl}/${test.index}/${role}`;
 
       // Create WebSocket signalling
       const signaling = new WebSocketSignaling(test, signalingServerUrl);
@@ -396,7 +396,7 @@ function cross_browser_test(func, name, properties) {
       };
 
       // Wait for both peers to complete the test function
-      await func(test, signaling, offering);
+      await func(test, signaling, role === 1);
     } else {
       // Create loopback signalling for both peers and glue them together
       const signaling1 = new LoopbackSignaling(test);
