@@ -81,10 +81,10 @@
       callee.ontrack = () => {
         eventSequence += 'ontrack;';
         ontrackResolver.resolve();
-      }
+      };
       caller.addTrack(tracks[0]);
       return Promise.all([
-        ontrackResolver.promise,
+        ontrackResolver,
         performOffer(caller, callee).then(() => {
           eventSequence += 'setRemoteDescription;';
         })
@@ -196,7 +196,7 @@
         }
         caller.addTrack(localTracks[1], localStream);
         Promise.all([
-          onaddtrackResolver.promise,
+          onaddtrackResolver,
           performOffer(caller, callee).then(() => {
             eventSequence += 'setRemoteDescription;';
           })
@@ -335,7 +335,7 @@
         });
         caller.removeTrack(sender);
         return Promise.all([
-          onremovetrackResolver.promise,
+          onremovetrackResolver,
           performOffer(caller, callee).then(() => {
             eventSequence += 'setRemoteDescription;';
           })
@@ -393,7 +393,7 @@
         });
         caller.removeTrack(sender);
         return Promise.all([
-          onmuteResolver.promise,
+          onmuteResolver,
           performOffer(caller, callee).then(() => {
             eventSequence += 'setRemoteDescription;';
           })
